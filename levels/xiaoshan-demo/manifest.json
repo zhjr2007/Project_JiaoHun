@@ -2,7 +2,7 @@
   "slug": "xiaoshan-demo",
   "title": "萧山剪辫案",
   "author": "Project JiaoHun 制作组",
-  "version": 2,
+  "version": 3,
   "license": "CC-BY-NC-4.0",
   "assets": [
     {
@@ -337,39 +337,39 @@
     },
     {
       "id": "evidence.ev_03",
-      "file": "levels/xiaoshan-demo/assets/evidence_ev_03.png",
-      "bytes": 27548,
-      "sha256": "de3782c794e39b9296ec8d62efb68ea1692878e537870f6ea3e613fa5d4c1f7f"
+      "file": "levels/xiaoshan-demo/assets/evidence_ev_03.webp",
+      "bytes": 50532,
+      "sha256": "491dbe66d907c7301906d7b8f3f68bdda622b2833b16324d4b84fda0d19ef331"
     },
     {
       "id": "evidence.ev_04",
-      "file": "levels/xiaoshan-demo/assets/evidence_ev_04.png",
-      "bytes": 21284,
-      "sha256": "8ddb3423389a41dc458421eaf77ebfb6384f1406177073d900feefd2a7435e79"
+      "file": "levels/xiaoshan-demo/assets/evidence_ev_04.webp",
+      "bytes": 14202,
+      "sha256": "3ecb44ff94581ffcb68c6608648c474d5298826365b15f843870e6dd2fedc457"
     },
     {
       "id": "evidence.ev_05",
-      "file": "levels/xiaoshan-demo/assets/evidence_ev_05.png",
-      "bytes": 26641,
-      "sha256": "18b171369746b131841a7a6cb28665eeceb901fb160c14f2a817da138afcc0b8"
+      "file": "levels/xiaoshan-demo/assets/evidence_ev_05.webp",
+      "bytes": 78442,
+      "sha256": "aaac4f47bd28d375d6095fea9198fdc11cc5fece2721d230c6df31b40f340cb7"
     },
     {
       "id": "evidence.ev_06",
-      "file": "levels/xiaoshan-demo/assets/evidence_ev_06.png",
-      "bytes": 57801,
-      "sha256": "731b997ee807f9ea3c03e1e554bf986f43b7821d831e9d182da655a61dfc1e4b"
+      "file": "levels/xiaoshan-demo/assets/evidence_ev_06.webp",
+      "bytes": 10446,
+      "sha256": "94358ad5d6e2b9dbc1b2a06b43b81d3edf2f7dbebcf691e8566a4b6cfa0ed017"
     },
     {
       "id": "evidence.ev_07",
-      "file": "levels/xiaoshan-demo/assets/evidence_ev_07.png",
-      "bytes": 29156,
-      "sha256": "d9500f27d0c9a2be15cd9a4680a314be4c725bddcda90e8e6cc3368c65ba34c9"
+      "file": "levels/xiaoshan-demo/assets/evidence_ev_07.webp",
+      "bytes": 14406,
+      "sha256": "8f4ee42cb2211ea0cd31608011096173416ed0f2aa84b0d4d081c29c2290e4ad"
     },
     {
       "id": "evidence.ev_08",
-      "file": "levels/xiaoshan-demo/assets/evidence_ev_08.png",
-      "bytes": 30678,
-      "sha256": "870bc279304079bfda499d17aa596ba2892e0d902f7ce81a3e6e8fa1d87e2f3a"
+      "file": "levels/xiaoshan-demo/assets/evidence_ev_08.webp",
+      "bytes": 31728,
+      "sha256": "bb384df34702fdd86d7fe8a7973b400f730b843b0d020d25ccc91097e8b95539"
     }
   ],
   "notes": "改编与 AI 生成配图工作稿；帽形与现场纤维比对为游戏设计。许可覆盖本关原创改编和有权许可部分，不涵盖原著或第三方资料，不对 AI 图像可版权性作保证。",

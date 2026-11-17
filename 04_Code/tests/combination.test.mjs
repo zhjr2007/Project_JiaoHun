@@ -20,7 +20,7 @@ test('同轮多举证点累计，双证物无序匹配，完整反驳后才进�
  const c=fixture();assert.deepEqual(validateContent(c),[]);let s=drain(c,createGame(c));
  s=step(c,s,{type:'SELECT_STATEMENT',statementId:'scissors_2'});s=step(c,s,{type:'PRESENT',evidenceId:'scissors'});
  assert.equal(s.pendingStage,null);s=drain(c,s);assert.equal(s.stageId,'hearing_scissors');
- assert.equal(s.statementIndex,3);s=step(c,s,{type:'SELECT_STATEMENT',statementId:'scissors_2'});
+ assert.equal(s.statementIndex,2);s=step(c,s,{type:'SELECT_STATEMENT',statementId:'scissors_2'});
  const repeated=dispatch(c,s,{type:'PRESENT',evidenceId:'scissors'});assert.equal(repeated.ok,false);assert.equal(repeated.state.ordinaryWill,5);
  s=step(c,s,{type:'SELECT_STATEMENT',statementId:'scissors_4'});s=step(c,s,{type:'PRESENT',evidenceIds:['braids','luggage']});
  assert.equal(s.stageId,'hearing_scissors');assert.equal(s.pendingStage,'hearing_braid');

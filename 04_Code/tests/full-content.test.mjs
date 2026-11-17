@@ -16,8 +16,9 @@ test('第一处举证完整播放后转到新陈述，保存恢复不丢已完�
  assert.equal(g.state.statementIndex,1);
  assert.match(g.state.dialogue.at(-1).text,/不能据此断定四把/);
  g.set(decodeSave(c,encodeSave(c,g.state)));g.drain();
- assert.equal(g.state.stageId,'round1');assert.equal(g.state.statementIndex,3);
+ assert.equal(g.state.stageId,'round1');assert.equal(g.state.statementIndex,2);
  assert.equal(getView(c,g.state).hearingProgress.completed,1);
+ g.send({type:'NEXT_STATEMENT'});assert.equal(g.state.statementIndex,3);
  g.send({type:'PRESENT',evidenceId:'EV_02'});g.drain();assert.equal(g.state.stageId,'round2');
 });
 test('已卡在旧陈述的v2存档可定位剩余疑点，不迁移或重置',()=>{

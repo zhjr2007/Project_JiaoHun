@@ -25,6 +25,21 @@ const marker = (stageId, itemId) => `${stageId}:${itemId}`;
 const lookup = (dictionary, key) => object(dictionary) && own(dictionary, key) ? dictionary[key] : undefined;
 const allInteractions = stage => (stage.locations ?? []).flatMap(location => location.interactions ?? []);
 
+/** A statement is retired once its rebuttal rule has been burned. */
+const retired = (stage, statementId, state) => (stage.rules ?? []).some(rule =>
+  rule.statementId === statementId && rule.onceFlag && state.flags.includes(rule.onceFlag));
+const openStatements = (stage, state) => (stage.statements ?? []).filter(item => !retired(stage, item.id, state));
+/** Cycle to the next statement the player has not yet disproved; keep position when all are done. */
+function stepStatement(stage, state, step) {
+  const all = stage.statements ?? [];
+  let index = state.statementIndex;
+  for (let hop = 0; hop < all.length; hop++) {
+    index = (index + step + all.length) % all.length;
+    if (!retired(stage, all[index].id, state)) return index;
+  }
+  return state.statementIndex;
+}
+
 function collectModel(content) {
   const flags = new Set();
   const declaredFlags = new Set();
@@ -199,6 +214,7 @@ export function validateContent(content) {
               || ['x', 'y', 'w', 'h'].some(key => !Number.isFinite(item.hotspot[key]) || item.hotspot[key] < 0 || item.hotspot[key] > 1)
               || item.hotspot.w <= 0 || item.hotspot.h <= 0 || item.hotspot.x + item.hotspot.w > 1 || item.hotspot.y + item.hotspot.h > 1)) fail(`${ipath}.hotspot 必须为画面内的归一化矩形。`);
             if (item.actor !== undefined && !nonempty(item.actor)) fail(`${ipath}.actor 无效。`);
+            asset(item.objectAssetId, `${ipath}.objectAssetId`);
             condition(item.requires, `${ipath}.requires`);
             reward(item, ipath);
             lines(item.lines, `${ipath}.lines`);
@@ -417,9 +433,7 @@ export function dispatch(content, state, action) {
           enterStage(content, next, target, events);
         } else if (!next.dialogue.length && stage.kind === 'hearing') {
           const current = stage.statements[next.statementIndex];
-          const solved = stage.rules.some(rule => rule.statementId === current.id && rule.onceFlag && next.flags.includes(rule.onceFlag));
-          const remaining = stage.rules.find(rule => rule.onceFlag && !next.flags.includes(rule.onceFlag) && satisfied(next, rule.requires));
-          if (solved && remaining) next.statementIndex = stage.statements.findIndex(item => item.id === remaining.statementId);
+          if (current && retired(stage, current.id, next)) next.statementIndex = stepStatement(stage, next, 1);
         }
         break;
       }
@@ -460,7 +474,7 @@ export function dispatch(content, state, action) {
           next.statementIndex = index;
         } else {
           const step = action.type === 'NEXT_STATEMENT' ? 1 : -1;
-          next.statementIndex = (next.statementIndex + step + stage.statements.length) % stage.statements.length;
+          next.statementIndex = stepStatement(stage, next, step);
         }
         break;
       }
@@ -492,7 +506,22 @@ export function dispatch(content, state, action) {
           if (response) {
             grant(next, response, events);
             queue(next, response.lines);
-          } else queue(next, [{ speaker: '沈砚', text: '眼下尚不能从这件东西问出更多，还是继续查核吧。' }]);
+          } else {
+            const name = resolveEvidence(content, next, action.evidenceId).name;
+            const who = action.actor ?? null;
+            if (!who) {
+              queue(next, [{ speaker: '沈砚', text: `（「${name}」在这里问不出什么。还是先问明该问的人。）` }]);
+            } else {
+              const puzzled = who === '曾日理'
+                ? [{ speaker: '曾日理', text: '这等物件，你去问当事人便好。我看不出它与你所问之事有何干系。' }]
+                : [{ speaker: who, text: '这个……小人看不出它与小人方才说的话有什么关连。' }];
+              queue(next, [
+                { speaker: '沈砚', text: `（将「${name}」递到${who}面前。）` },
+                ...puzzled,
+                { speaker: '沈砚', text: `（${who}似乎对这件东西并不知情，也提不起兴致。此处再问也是白费。）` },
+              ]);
+            }
+          }
           events.push({ type: 'evidence_presented', evidenceId: action.evidenceId, ...(action.actor ? { actor: action.actor } : {}) });
           break;
         }
@@ -508,14 +537,17 @@ export function dispatch(content, state, action) {
           events.push({ type: 'presentation_correct', evidenceId: presented[0], evidenceIds: presented, statementId: statement.id });
         } else {
           const item = { name: presented.map(id => resolveEvidence(content, next, id).name).join('、') };
-          queue(next, [
-            { speaker: '蔡瑞', text: `这份「${item.name}」，并不能证明小人方才这句话有何不实。` },
-            { speaker: '曾日理', text: '沈砚，物件虽与案件有关，仍须说明它如何驳倒眼前这句证词。' },
-            { speaker: '曾日理', text: '此次举证不妥，威信减一。', cue: 'will_penalty' },
-            { speaker: '曾日理', text: next[stage.pool === 'ordinary' ? 'ordinaryWill' : 'finalWill'] > 1
-              ? '回到方才的证词，想清楚再问。' : '举证至此，已不足以支持继续查问。' },
-          ]);
           const field = stage.pool === 'ordinary' ? 'ordinaryWill' : 'finalWill';
+          const after = next[field] - 1;
+          const quote = statement.text.length > 20 ? `${statement.text.slice(0, 20)}……` : statement.text;
+          queue(next, [
+            { speaker: '蔡瑞', text: `「${item.name}」？小人方才说的是「${quote}」——这东西与那句话如何对得上？` },
+            { speaker: '蔡瑞', text: '大人明鉴，小人句句照实回话，并未改口。' },
+            { speaker: '曾日理', text: `沈砚，举证须指实矛盾在何处。你举「${item.name}」，却没有说明它怎样驳倒这句证词。` },
+            { speaker: '曾日理', text: '此次举证不妥，威信减一。', cue: 'will_penalty' },
+            { speaker: '沈砚', text: '（确实对不上……我得再仔细想一想。）' },
+            { speaker: '曾日理', text: after > 1 ? '回到方才的证词，想清楚再问。' : '举证至此，已不足以支持继续查问。' },
+          ]);
           next[field] -= 1;
           if (next[field] === 0) next.pendingStage = stage.failure;
           events.push({ type: 'presentation_wrong', evidenceId: presented[0], evidenceIds: presented, statementId: statement.id });
@@ -563,8 +595,10 @@ export function getView(content, state) {
   if (errors.length) throw new Error(`游戏状态无效：${errors[0]}`);
   const stage = content.stages[state.stageId];
   const location = stage.kind === 'investigation' ? stage.locations.find(item => item.id === state.locationId) : null;
+  // Retired statements leave the rotation, so a point already disproved never returns.
   const statements = stage.kind === 'hearing'
-    ? stage.statements.map(({ id, speaker, text }) => ({ id, speaker, text })) : [];
+    ? openStatements(stage, state).map(({ id, speaker, text }) => ({ id, speaker, text })) : [];
+  const current = stage.kind === 'hearing' ? stage.statements[state.statementIndex] ?? null : null;
   const checkpoint = stage.retryStage ? state.checkpoints[content.stages[stage.retryStage].pool] : null;
   const busy = state.dialogue.length > 0;
   return {
@@ -578,14 +612,26 @@ export function getView(content, state) {
     interactions: (location?.interactions ?? []).filter(item => satisfied(state, item.requires)).map(item => ({
       id: item.id, label: item.label, kind: item.kind,
       ...(item.actor ? { actor: item.actor } : {}),
+      ...(item.objectAssetId ? { objectAssetId: item.objectAssetId } : {}),
+      ...(item.hotspot ? { hotspot: item.hotspot } : {}),
       completed: state.completedInteractions.includes(marker(stage.id, item.id)),
     })),
-    statements, statement: statements[state.statementIndex] ?? null,
-    statementIndex: state.statementIndex, statementCount: statements.length,
+    statements, statement: current,
+    statementIndex: Math.max(0, statements.findIndex(item => item.id === current?.id)),
+    statementCount: statements.length,
+    statementNumber: current ? stage.statements.indexOf(current) + 1 : 0,
+    statementTotal: (stage.statements ?? []).length,
+    statementHasOpenPoint: stage.kind === 'hearing' && Boolean(current)
+      && stage.rules.some(rule => rule.statementId === current.id && rule.onceFlag && !state.flags.includes(rule.onceFlag) && satisfied(state, rule.requires)),
+    // True only when this statement's open point can be answered by two items at once.
+    // The UI uses it to hint at combination presentation after a failed attempt.
+    statementNeedsCombination: stage.kind === 'hearing' && Boolean(current)
+      && stage.rules.some(rule => rule.statementId === current.id && rule.onceFlag && !state.flags.includes(rule.onceFlag)
+        && satisfied(state, rule.requires) && (rule.evidenceIds ?? []).length > 1),
     hearingProgress: stage.kind === 'hearing' ? {
       total: stage.rules.filter(rule => rule.onceFlag).length,
       completed: stage.rules.filter(rule => rule.onceFlag && state.flags.includes(rule.onceFlag)).length,
-      currentSolved: stage.rules.some(rule => rule.statementId === statements[state.statementIndex]?.id && rule.onceFlag && state.flags.includes(rule.onceFlag)),
+      currentSolved: stage.rules.some(rule => rule.statementId === current?.id && rule.onceFlag && state.flags.includes(rule.onceFlag)),
       nextStatementId: stage.rules.find(rule => rule.onceFlag && !state.flags.includes(rule.onceFlag) && satisfied(state, rule.requires))?.statementId ?? null,
     } : null,
     evidence: state.evidence.map(evidenceId => resolveEvidence(content, state, evidenceId)),
@@ -596,6 +642,7 @@ export function getView(content, state) {
     displayWill: stage.pool ? Math.min(5, (stage.pool === 'ordinary' ? state.ordinaryWill : state.finalWill)
       + (state.dialogue.findIndex(line => line.cue === 'will_penalty') > 0 ? 1 : 0)) : null,
     pool: stage.pool ?? null,
+    requirementsMet: stage.kind === 'investigation' && satisfied(state, stage.requires),
     canAdvance: !busy && stage.kind === 'investigation' && satisfied(state, stage.requires),
     canRetry: !busy && stage.kind === 'ending' && stage.outcome !== 'success' && Boolean(checkpoint),
     outcome: stage.outcome ?? null,
@@ -631,6 +678,7 @@ function resolvePresentation(content, state, stage, location) {
     }),
     hotspots: visible.filter(item => item.hotspot).map(item => ({
       interactionId: item.id, label: item.label, ...item.hotspot,
+      ...(item.objectAssetId ? { objectAssetId: item.objectAssetId } : {}),
       completed: state.completedInteractions.includes(marker(stage.id, item.id))
     }))
   };

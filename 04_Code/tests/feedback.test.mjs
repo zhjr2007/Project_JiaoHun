@@ -21,6 +21,7 @@ test('错误举证先反驳、制止，再显示扣点；反馈中重载不会�
   state=decodeSave(content,encodeSave(content,state));
   assert.equal(state.ordinaryWill,4);assert.equal(getView(content,state).displayWill,5);
   send({type:'NEXT_DIALOGUE'});assert.equal(getView(content,state).displayWill,5);
+  send({type:'NEXT_DIALOGUE'});assert.equal(getView(content,state).displayWill,5);
   send({type:'NEXT_DIALOGUE'});assert.equal(getView(content,state).displayWill,4);
   assert.equal(getView(content,state).dialogue.cue,'will_penalty');
   drain();assert.equal(getView(content,state).displayWill,4);assert.equal(state.statementIndex,0);

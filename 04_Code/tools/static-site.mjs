@@ -15,7 +15,7 @@ export async function buildStaticSite(project,build){
  html=html.replace('自动保存于当前浏览器','正在读取 NAS 进度……');
  await writeFile(resolve(site,'play.html'),html);
  let app=await readFile(resolve(code,'web/app.mjs'),'utf8');
- app=app.replace("import { demoContent } from '/content/demo-content.mjs';","import {demoContent,assetCatalog,levelSlug} from './level-loader.mjs';").replace("from '/core/engine.mjs'","from './core/engine.mjs'").replace("from '/core/save.mjs'","from './core/save.mjs'").replace("import { assetCatalog } from '/assets.mjs';",'');
+ app=app.replace("import { demoContent } from '/content/demo-content.mjs';","import {demoContent,assetCatalog,levelSlug,contentSha256} from './level-loader.mjs';").replace("from '/core/engine.mjs'","from './core/engine.mjs'").replace("from '/core/save.mjs'","from './core/save.mjs'").replace("import { assetCatalog } from '/assets.mjs';",'');
  await writeFile(resolve(site,'app.mjs'),"import {gamePlatform} from './network-play.mjs';\n"+app);
  console.log(`网页关卡：${report.levels.length} 有效，${report.rejected.length} 拒绝；认证与大屏入口已打包`);
 }

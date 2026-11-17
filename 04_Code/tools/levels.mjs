@@ -29,7 +29,7 @@ export async function validateLevel(root,slug){
  if(total>MAX_ASSET_BYTES)throw Error('单关资产超过 8MB');
  const walk=value=>{if(!value||typeof value!=='object')return;for(const [key,child] of Object.entries(value)){if(['__proto__','constructor','prototype'].includes(key))throw Error('禁止原型键');if(key.endsWith('AssetId')||key==='assetId'){if(typeof child==='string'&&!ids.has(child))throw Error(`缺少资源 ${child}`);}else walk(child);}};
  walk(content);
- const allowed=new Set(['content.json','manifest.json',...(files.size?['assets']:[])]);
+ const allowed=new Set(['content.json','manifest.json','nodes.json',...(files.size?['assets']:[])]);
  for(const ent of await readdir(base,{withFileTypes:true}))if(!allowed.has(ent.name)||ent.isSymbolicLink())throw Error('内容包含未声明文件');
  if(files.size)for(const ent of await readdir(resolve(base,'assets'),{withFileTypes:true}))if(!ent.isFile()||!files.has(`levels/${slug}/assets/${ent.name}`))throw Error('资源目录含未声明文件');
  return {manifest,content,total,contentSha256:hash(await readFile(resolve(base,'content.json'))),manifestSha256:hash(await readFile(resolve(base,'manifest.json')))};
@@ -41,6 +41,8 @@ export async function buildLevels(root,out){
    const result=await validateLevel(root,ent.name),m=result.manifest;
    const target=resolve(out,'levels',ent.name);await mkdir(target,{recursive:true});
    for(const name of ['content.json','manifest.json'])await copyFile(resolve(root,'levels',ent.name,name),resolve(target,name));
+   // nodes.json 是可选的章节跳转快照，随关卡一起发布；没有就跳过（旧关卡可能未生成）。
+   try{await copyFile(resolve(root,'levels',ent.name,'nodes.json'),resolve(target,'nodes.json'));}catch{}
    for(const file of new Set(m.assets.map(a=>a.file))){await mkdir(dirname(resolve(out,file)),{recursive:true});await copyFile(resolve(root,file),resolve(out,file));}
    levels.push({slug:m.slug,title:m.title,author:m.author,version:m.version,license:m.license,bytes:result.total,status:'valid',...(m.archived===true?{archived:true}:{}),contentSha256:result.contentSha256,manifestSha256:result.manifestSha256});
   }catch(error){rejected.push({slug:ent.name,error:error.message});}

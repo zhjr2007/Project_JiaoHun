@@ -7,12 +7,13 @@ async function load(){
  const index=JSON.parse(await get('./levels/index.json')),entry=index.levels.find(l=>l.slug===levelSlug);
  if(!entry)throw Error('此关卡尚未收录');
  const [rawContent,rawManifest]=await Promise.all(['content','manifest'].map(name=>get(`./levels/${levelSlug}/${name}.json`)));
- if(await digest(rawContent)!==entry.contentSha256||await digest(rawManifest)!==entry.manifestSha256)throw Error('关卡版本不一致，请刷新');
+ const contentSha256=await digest(rawContent);
+ if(contentSha256!==entry.contentSha256||await digest(rawManifest)!==entry.manifestSha256)throw Error('关卡版本不一致，请刷新');
  const content=JSON.parse(rawContent),manifest=JSON.parse(rawManifest),catalog=Object.create(null);
  if(validateContent(content).length)throw Error('关卡契约无效');
  for(const asset of manifest.assets){if(!new RegExp(`^levels/${levelSlug}/assets/[a-zA-Z0-9_-]+\\.(png|jpg|webp)$`).test(asset.file))throw Error('配图路径无效');catalog[asset.id]={src:`./${asset.file}`};}
- return {content,catalog};
+ return {content,catalog,contentSha256};
 }
 let loaded;
 try{loaded=await load();}catch(error){document.getElementById('stage-title').textContent='卷宗未能打开';document.getElementById('notice').textContent=error.message;throw error;}
-export const demoContent=loaded.content,assetCatalog=loaded.catalog;
+export const demoContent=loaded.content,assetCatalog=loaded.catalog,contentSha256=loaded.contentSha256;

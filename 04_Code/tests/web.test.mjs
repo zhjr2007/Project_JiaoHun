@@ -40,7 +40,18 @@ class NodeStub {
         if (enabled) classes.add(name); else classes.delete(name);
         this.className = [...classes].join(' ');
         return enabled;
-      }
+      },
+      add: (...names) => {
+        const classes = new Set(this.className.split(/\s+/).filter(Boolean));
+        for (const name of names) classes.add(name);
+        this.className = [...classes].join(' ');
+      },
+      remove: (...names) => {
+        const classes = new Set(this.className.split(/\s+/).filter(Boolean));
+        for (const name of names) classes.delete(name);
+        this.className = [...classes].join(' ');
+      },
+      contains: name => this.className.split(/\s+/).filter(Boolean).includes(name)
     };
   }
   set textContent(value) {
@@ -314,6 +325,9 @@ test('选择证物不立即判定，确认出示才扣一点且返回原句', as
   assert.match(app.node('will').textContent, /5\/5/, '蔡瑞先反驳，画面暂不扣点');
   assert.equal(app.node('speaker').textContent, '蔡瑞');
   await click(app, 'actions', '继续');
+  assert.equal(app.node('speaker').textContent, '蔡瑞', '蔡瑞先辩解两句，再轮到大人');
+  assert.match(app.node('will').textContent, /5\/5/, '蔡瑞辩解时仍是原威信');
+  await click(app, 'actions', '继续');
   assert.equal(app.node('speaker').textContent, '曾日理');
   assert.match(app.node('will').textContent, /5\/5/, '曾日理制止时仍显示原威信');
   await click(app, 'actions', '继续');
@@ -433,7 +447,11 @@ test('人物选择只改变交谈对象和话题，向当前人物出示不会�
   await click(app,'actions','向在场人物出示');await click(app,'record-content',/^物证四把剪刀/);
   assert.match(app.node('record-content').textContent,/准备向正一出示/);
   await click(app,'record-actions','确认出示');
-  assert.match(app.node('line').textContent,/眼下尚不能/);
+  assert.match(app.node('line').textContent,/递到正一面前/);
+  await click(app,'actions','继续');
+  assert.equal(app.node('speaker').textContent,'正一');
+  // 正一没有关于剪刀的说法，只会以自己的口吻说看不出关连，不会借用别人的应答。
+  assert.match(app.node('line').textContent,/看不出它与/);
   assert.equal(app.state().ordinaryWill,before.ordinaryWill);
 });
 
@@ -474,10 +492,14 @@ test('缺失和载入失败的素材显示明确提示，不能伪装已完成�
 
 test('按钮或对白获得焦点后，左右快捷键仍切换证词；输入及模态框不抢键',async()=>{
  const app=boot();await openFirstHearing(app);
+ await continueDialogue(app);
+ // 查办途中取得的凭据会弹「获取凭据」提示，先收下再试键盘（与玩家实际操作顺序一致）。
+ if(app.node('acquired').open)await app.node('acquired-close').click();
  const handlers=app.document.listeners.get('keydown');
  async function key(value){for(const handler of handlers)await handler({key:value,preventDefault(){}});}
  app.document.activeElement=findButton(app,'actions','追问');
- await key('ArrowRight');assert.equal(app.view().statementIndex,1);
+ await key('ArrowRight');
+ assert.equal(app.view().statementIndex,1);
  app.document.activeElement=app.node('line');
  await key('ArrowLeft');assert.equal(app.view().statementIndex,0);
  app.document.activeElement=app.node('text-speed');await key('ArrowRight');assert.equal(app.view().statementIndex,0);
