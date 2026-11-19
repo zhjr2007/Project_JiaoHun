@@ -54,3 +54,19 @@
 - **回滚**：`mv site site.failed && mv site.before-bgm-20261120-024226 site`（无需重启）。
 - **未验证**：实际听感、音量平衡、与对白的 ducking 效果、移动端自动播放策略——这些只能人工试听；自动测试与 HTTP 200 不等于听感通过。
 **更正记录（02:55）**：本回执最初写的是"PR #5 尚未合并、NAS 与 `main` 暂时不一致"，那是在合并前约一分钟做的检查（`git merge-base --is-ancestor pr-5 origin/main` 返回未合并）。合并后复核：`59b3f5c` 是 `aca3d1d` + `8e4c59a` 的合并提交，`git diff 8e4c59a 59b3f5c` 为空、`git diff 59b3f5c HEAD -- 04_Code` 也为空，即**部署内容与 `main` 一致**，原判断作废。`bgm_05_court.m4a` 在 `main` 上同样缺（该批 11 个文件），线上 404 并由 `fallback: 'mist'` 降级。
+## 多入口一致性（补验，02:5x）
+
+四个入口（`.top` / `.xyz` × 443 / 8443）实测发的是同一份站点：`.top` 与 `.xyz` 解析到同一组地址
+（IPv6 `2409:8a55:...`、IPv4 `8.163.5.244`），同一个 Caddy。
+
+新增 `04_Code/tools/verify-entries.mjs` 把这件事变成可重复的检查：对四个入口逐个取首页、样式、脚本、
+纹理、配乐与接口健康，按字节哈希比对。本次结果 4 × 9 全部 `OK`、退出码 0：
+
+```text
+/ 2067B · /lobby.css 21259B · /theme.js 2414B · /entry-tour.mjs 10766B · /play.html 8098B
+/audio.mjs 19209B · /chrome/paper.webp 5796B · /media/bgm/bgm_01_entry.mp3 9846865B · /api/v2/health 79B
+```
+
+入口与缓存说明见 [GAME_ENTRIES_AND_CACHE.md](GAME_ENTRIES_AND_CACHE.md)：四个入口无需分别发布，但换入口会换
+origin，主题偏好与音乐开关按 origin 各自记住；Caddy 未下发 `Cache-Control`，所以"文字更新了、背景没更新"
+通常是 CSS 被启发式缓存，硬刷新即可，根治需要维护者在 Caddy 上加缓存头。

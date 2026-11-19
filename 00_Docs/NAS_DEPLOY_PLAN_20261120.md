@@ -67,6 +67,18 @@ GET /game/chrome/stain.webp   image/webp
 
 浏览器控制台应无 CSP 违规（新增脚本均为同源外链）；除预期的未登录 401 与 favicon 403 外不应有资源错误。
 
+### 四个入口一起验
+
+同一份 `site/` 由四个入口提供服务（`.top` / `.xyz` × 443 / 8443，见 [GAME_ENTRIES_AND_CACHE.md](GAME_ENTRIES_AND_CACHE.md)），
+更新一次即全部生效。发布后跑一次：
+
+```bash
+node 04_Code/tools/verify-entries.mjs
+```
+
+它按字节哈希比对四个入口的首页、样式、脚本、纹理、配乐与接口健康；出现 `DIVERGENT` 说明有入口指向别的目录，
+需核对 NAS 上各站点块的 `root`。全部 `OK` 且退出码 0 才算这一步通过。
+
 ## 5. 回滚
 
 - 站点：恢复上一轮的 `site.before-<timestamp>/`；`runtime/` 同理。
