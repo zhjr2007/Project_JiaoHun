@@ -46,10 +46,11 @@
 
 ## 追加：配乐批次（PR #5，02:42:26）
 
-- **来源**：`refs/pull/5/head`（`8e4c59a 配乐接入：按场景/地点/物件的 BGM 调度与音乐控件`），**尚未合并进 `main`**。因此 NAS 当前状态是 `main + PR #5` 的组合，与 `main` 暂时不一致；若日后从 `main` 直接重新部署，配乐会消失。
+- **来源**：PR #5，已于 **02:38:32** 以 `59b3f5c` 合入 `main`（parents = `aca3d1d` + `8e4c59a`）。部署用的是 PR head `8e4c59a`，而 `git diff 8e4c59a 59b3f5c` **为空**——PR head 的树与合并后的 `main` 完全一致，因此 NAS 与 `main` **没有漂移**，日后从 `main` 重新部署不会丢配乐。`app.mjs`（+22 行）与 `build.mjs`（+1 行）属于该 PR 本体，已在部署内容中。
 - **内容**：`audio.mjs`（440 行，按场景/地点/物件的 BGM 调度 + 音乐控件）、`index.html` 增加一个 module 脚本、`style.css` 31 行、11 个音频文件（约 41.6MB）、`static-site.mjs` 增加 `web/media` 整目录复制。
 - **范围**：只换 `site/`；`runtime/` 无改动，**未重启服务**（纯静态），切换后健康仍为 `ok / contentVersion=3`。
 - **验证**：`/game/audio.mjs` 200 `text/javascript` 19209B；`/game/media/bgm/bgm_01_entry.mp3` 200 `audio/mpeg` 9846865B；`bgm_02_rumor.m4a` 200 `audio/mp4` 2306651B；`/game/play.html` 200 且引用 `./audio.mjs`；`/game/` 200。
 - **已知缺口**：`audio.mjs` 里 `court` 引用的 `bgm_05_court.m4a` 未随 PR 提交 → 线上 404。代码声明了 `fallback: 'mist'`，载入失败会切到迷雾曲并 `console.warn`，属降级而非崩溃。若作者保有该文件，补进 `04_Code/web/media/bgm/` 即可。
 - **回滚**：`mv site site.failed && mv site.before-bgm-20261120-024226 site`（无需重启）。
 - **未验证**：实际听感、音量平衡、与对白的 ducking 效果、移动端自动播放策略——这些只能人工试听；自动测试与 HTTP 200 不等于听感通过。
+**更正记录（02:55）**：本回执最初写的是"PR #5 尚未合并、NAS 与 `main` 暂时不一致"，那是在合并前约一分钟做的检查（`git merge-base --is-ancestor pr-5 origin/main` 返回未合并）。合并后复核：`59b3f5c` 是 `aca3d1d` + `8e4c59a` 的合并提交，`git diff 8e4c59a 59b3f5c` 为空、`git diff 59b3f5c HEAD -- 04_Code` 也为空，即**部署内容与 `main` 一致**，原判断作废。`bgm_05_court.m4a` 在 `main` 上同样缺（该批 11 个文件），线上 404 并由 `fallback: 'mist'` 降级。
