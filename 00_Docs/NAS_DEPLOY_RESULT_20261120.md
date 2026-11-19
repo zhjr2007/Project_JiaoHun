@@ -43,3 +43,13 @@
 - **观感**：浅色纸纹强度、边缘磨摊深浅、深色场景图浓淡，以及深浅两套是否"像同一份卷宗"，由作者看图确认。两张纹理在 `02_Art/CHROME_MANIFEST.json` 里仍标 `generated-working-art; user-artistic-acceptance-pending`。
 - **真机**：Android Chrome 全屏后是否真的锁住横屏、iOS 的 CSS 旋转兜底是否可接受、软键盘弹起时引导牌位置。自动化只覆盖模拟视口（320/360/390/412/430/1440/1920 + 文字放大一档），不等于真机。
 - **基线既有、本批未处理**：360px 下入场页 header 两个链接高 30px、主持页页签链接 21.4px、大屏 join-url 16.5px。
+
+## 追加：配乐批次（PR #5，02:42:26）
+
+- **来源**：`refs/pull/5/head`（`8e4c59a 配乐接入：按场景/地点/物件的 BGM 调度与音乐控件`），**尚未合并进 `main`**。因此 NAS 当前状态是 `main + PR #5` 的组合，与 `main` 暂时不一致；若日后从 `main` 直接重新部署，配乐会消失。
+- **内容**：`audio.mjs`（440 行，按场景/地点/物件的 BGM 调度 + 音乐控件）、`index.html` 增加一个 module 脚本、`style.css` 31 行、11 个音频文件（约 41.6MB）、`static-site.mjs` 增加 `web/media` 整目录复制。
+- **范围**：只换 `site/`；`runtime/` 无改动，**未重启服务**（纯静态），切换后健康仍为 `ok / contentVersion=3`。
+- **验证**：`/game/audio.mjs` 200 `text/javascript` 19209B；`/game/media/bgm/bgm_01_entry.mp3` 200 `audio/mpeg` 9846865B；`bgm_02_rumor.m4a` 200 `audio/mp4` 2306651B；`/game/play.html` 200 且引用 `./audio.mjs`；`/game/` 200。
+- **已知缺口**：`audio.mjs` 里 `court` 引用的 `bgm_05_court.m4a` 未随 PR 提交 → 线上 404。代码声明了 `fallback: 'mist'`，载入失败会切到迷雾曲并 `console.warn`，属降级而非崩溃。若作者保有该文件，补进 `04_Code/web/media/bgm/` 即可。
+- **回滚**：`mv site site.failed && mv site.before-bgm-20261120-024226 site`（无需重启）。
+- **未验证**：实际听感、音量平衡、与对白的 ducking 效果、移动端自动播放策略——这些只能人工试听；自动测试与 HTTP 200 不等于听感通过。
