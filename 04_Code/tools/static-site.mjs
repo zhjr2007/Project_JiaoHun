@@ -6,13 +6,14 @@ export async function buildStaticSite(project,build){
  const report=await buildLevels(project,site);
  await writeFile(resolve(project,'09_Builds/levels-validation.json'),JSON.stringify(report,null,2));
  await cp(resolve(code,'core'),resolve(site,'core'),{recursive:true});
- const files=['style.css','level-loader.mjs','level-list.mjs','player.mjs','cloud-progress.mjs','network-lobby.mjs','theme.js','entry-tour.mjs','network-play.mjs','lobby.css','avatars.mjs','operator.html','operator.css','operator.mjs','screen.html','screen.css','screen.mjs','inspect.html','inspect.mjs'];
+ const files=['style.css','audio.mjs','level-loader.mjs','level-list.mjs','player.mjs','cloud-progress.mjs','network-lobby.mjs','theme.js','entry-tour.mjs','network-play.mjs','lobby.css','avatars.mjs','operator.html','operator.css','operator.mjs','screen.html','screen.css','screen.mjs','inspect.html','inspect.mjs'];
  for(const name of files)await copyFile(resolve(code,'web',name),resolve(site,name));
  await cp(resolve(code,'web/vendor'),resolve(site,'vendor'),{recursive:true});
  await cp(resolve(code,'web/chrome'),resolve(site,'chrome'),{recursive:true});
+ await cp(resolve(code,'web/media'),resolve(site,'media'),{recursive:true});
  await copyFile(resolve(code,'web/lobby.html'),resolve(site,'index.html'));
  let html=await readFile(resolve(code,'web/index.html'),'utf8');
- html=html.replace('href="/style.css"','href="./style.css"').replace('src="/app.mjs"','src="./app.mjs"').replace('href="/" aria-label','href="./" aria-label');
+ html=html.replace('href="/style.css"','href="./style.css"').replace('src="/app.mjs"','src="./app.mjs"').replace('src="/audio.mjs"','src="./audio.mjs"').replace('href="/" aria-label','href="./" aria-label');
  html=html.replace('自动保存于当前浏览器','正在读取 NAS 进度……');
  await writeFile(resolve(site,'play.html'),html);
  let app=await readFile(resolve(code,'web/app.mjs'),'utf8');

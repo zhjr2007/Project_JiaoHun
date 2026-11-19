@@ -49,6 +49,7 @@ const bundle=[
   assetBundle, stripImports(app)
 ].join('\n');
 const standalone=html.replace('<link rel="stylesheet" href="/style.css">',()=>`<style>${css}</style>`)
+  .replace('<script type="module" src="/audio.mjs"></script>','')
   .replace('<script type="module" src="/app.mjs"></script>',()=>`<script type="module">\n${bundle.replaceAll('</script','<\\/script')}\n</script>`)
   .replace('href="/" aria-label','href="#game" aria-label');
 await writeFile(resolve(build,'Demo.html'),standalone,'utf8');

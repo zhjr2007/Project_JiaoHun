@@ -52,13 +52,13 @@ function showRecordsToast(message){
   },RECORDS_TOAST_MS);
 }
 function persist(){if(autosavePaused||platform.readOnly)return;try{const encoded=encodeSave(demoContent,state);localStorage.setItem(storageKey,encoded);platform.onSave?.(encoded);}catch{tell('浏览器自动保存暂不可用。你仍可用“导出存档”保存当前进度。');}}
-function act(action){if(platform.readOnly||platform.ready===false)return false;try{const needsCombination=Boolean(view&&!view.dialogue&&view.statementNeedsCombination);const result=dispatch(demoContent,state,action);if(!result.ok){tell(typeof result.error==='string'?result.error:'当前不能进行这项操作。');return false;}const panelOpen=$('investigation').open;state=result.state;notice='';persist();
+function act(action){if(platform.readOnly||platform.ready===false)return false;try{const needsCombination=Boolean(view&&!view.dialogue&&view.statementNeedsCombination);const result=dispatch(demoContent,state,action);if(!result.ok){tell(typeof result.error==='string'?result.error:'当前不能进行这项操作。');return false;}const panelOpen=$('investigation').open;state=result.state;notice='';persist();const started=result.events.find(event=>event.type==='interaction');if(started){musicInteraction=started.interactionId;musicInteractionAt=Date.now();}
     // A single item cannot close a two-item point; nudge the player once per stage.
     if(needsCombination&&result.events.some(event=>event.type==='presentation_wrong')){
       const key=`combo|${state.stageId}`;
       if(hintUsed(key)<HINT_MAX_SHOWS)voiceOverride={text:'（单凭一件凭据驳不倒这一句。帽檐上的纤维，得同那截辫子并在一处比对才成。）',key,stageId:state.stageId};
     }
-    render();if(panelOpen&&view.kind!=='investigation')$('investigation').close();collectEvidence(result.events);if(result.events.some(e=>e.type==='presentation_correct'))showFeedback('据此查问');else if(result.events.some(e=>e.type==='presentation_wrong'))showFeedback('举证');return true;}catch(error){tell(`操作未完成：${error.message}`);return false;}}
+    render();if(panelOpen&&view.kind!=='investigation')$('investigation').close();collectEvidence(result.events);if(result.events.some(e=>e.type==='presentation_correct')){showFeedback('据此查问');musicCue('breakthrough',{maxMs:12000,minGapMs:9000});}else if(result.events.some(e=>e.type==='presentation_wrong'))showFeedback('举证');return true;}catch(error){tell(`操作未完成：${error.message}`);return false;}}
 function collectEvidence(events){
   for(const event of events){if(event.type!=='evidence_added')continue;const item=view?.evidence.find(entry=>entry.id===event.evidenceId);if(item&&!acquiredQueue.some(queued=>queued.id===item.id))acquiredQueue.push(item);}
   flushAcquired();
@@ -204,6 +204,21 @@ function renderFlavor(){
   node.hidden=false;
 }
 function resetFlavor(){flavorStage=null;flavorShownAt=0;clearTimeout(flavorHoldTimer);clearTimeout(flavorHideTimer);const node=$('flavor-line');if(node){node.classList.remove('leaving');node.hidden=true;}}
+// 音乐只把“当前场景”交给 audio.mjs：选曲、对白压低、交叉淡化都在那边处理，这里不判断曲目。
+// 会审里“开场陈述”和“追问对白”都表现为 dialogue，靠进入阶段后是否还停在开场来判断。
+let musicStage=null,musicIntro=true;
+// 查看某件物件时临时换的曲（如纤维辫子 → 言辞交锋）；对白结束、弹窗关掉后自动撤销。
+let musicInteraction=null,musicInteractionAt=0;
+function syncMusic(){
+  const hook=window.__jiaohunMusic;if(!hook?.update)return;
+  const intro=demoContent.stages?.[view.stageId]?.intro?.length||0;
+  if(view.stageId!==musicStage){musicStage=view.stageId;musicIntro=intro>0;}
+  if(!view.dialogue)musicIntro=false;
+  const progress=view.hearingProgress;
+  if(musicInteraction&&!view.dialogue&&!acquiredOpen&&!acquiredQueue.length&&Date.now()-musicInteractionAt>600)musicInteraction=null;
+  hook.update({kind:view.kind,stageId:view.stageId,outcome:view.outcome||'',speaker:view.dialogue?.speaker||view.statement?.speaker||'',dialogue:Boolean(view.dialogue),inIntro:musicIntro,introLength:intro,lineIndex:intro-(view.dialogueRemaining||0),settled:Boolean(progress?.total&&progress.completed===progress.total),locationId:view.locationId||'',interaction:musicInteraction||''});
+}
+function musicCue(key,options){window.__jiaohunMusic?.cue?.(key,options);}
 function render(externalView){
   view=externalView||getView(demoContent,state);if(currentLocation!==view.locationId){selectedActor=null;currentLocation=view.locationId;}if(!view.presentation.actors.some(a=>a.name===selectedActor))selectedActor=view.presentation.actors[0]?.name||null;
   $('game').dataset.kind=view.kind;$('game').dataset.speaking=String(Boolean(view.dialogue));$('investigation-tools').hidden=view.kind!=='investigation'||Boolean(view.dialogue)||platform.readOnly;
@@ -240,6 +255,7 @@ function render(externalView){
   else if(view.kind==='investigation'){if(selectedActor)actions.append(button('向在场人物出示',()=>openRecords(true)));actions.append(button('证佐凭据',()=>openRecords()),button('继续查办',()=>act({type:'ADVANCE_STAGE'}),{primary:true,disabled:!view.canAdvance}));}
   else if(view.kind==='ending'){if(view.canRetry)actions.append(button('从本阶段重试',()=>act({type:'RETRY'}),{primary:true}));actions.append(button('重新开始',restart,{primary:!view.canRetry}));}
   $('notice').textContent=notice;
+  syncMusic();
   renderVoiceHint();
   renderPanelDialogue();
   flushAcquired();
@@ -330,7 +346,7 @@ async function openNodePicker(){
 }
 $('record').addEventListener('click',()=>openRecords());$('journal').addEventListener('click',()=>openRecords());$('records-open').addEventListener('click',()=>openRecords());$('close-records').addEventListener('click',()=>records.close());
 $('acquired-close').addEventListener('click',()=>$('acquired').close());
-$('acquired').addEventListener('close',()=>{acquiredOpen=false;flushAcquired();resumePanel();});
+$('acquired').addEventListener('close',()=>{acquiredOpen=false;flushAcquired();resumePanel();syncMusic();});
 for(const id of ['investigation','records','story-log','game-menu','settings','nodes'])$(id).addEventListener('close',()=>{if(id==='records')hideRecordsToast();if(!acquiredOpen)flushAcquired();if(id!=='investigation')resumePanel();});
 $('panel-line').addEventListener('click',advanceDialogue);$('panel-continue').addEventListener('click',advanceDialogue);
 for(const node of document.querySelectorAll('[data-tab]'))node.addEventListener('click',()=>{tab=node.dataset.tab;selected=null;renderRecords();});
