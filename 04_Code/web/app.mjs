@@ -8,6 +8,20 @@ const $=id=>document.getElementById(id),storageKey=platform.storageKey||'jiaohun
 let state,view,notice='',autosavePaused=false,presentMode=false,tab='evidence',selected=null,selectedActor=null,currentLocation=null;
 let combinationMode=false,combination=[];
 let acquiredQueue=[],acquiredOpen=false,voiceOverride=null,voiceTimer=0,resumePanelTab=null;
+// 台词配音：voice-index.json 由「说话人|台词」映射到音频 id，音频放在 ./audio/<id>.wav
+let voiceIndex=null,voiceAudio=null,lastVoiceKey='';
+fetch('./voice-index.json',{cache:'no-cache'}).then(response=>response.ok?response.json():null).then(value=>{voiceIndex=value||{};}).catch(()=>{voiceIndex={};});
+function playVoiceLine(speaker,text){
+ if(!voiceIndex)return;
+ const line=String(text||'').trim();if(!line)return;
+ const key=speaker+'|'+line;
+ if(key===lastVoiceKey)return;
+ const id=voiceIndex[key];
+ if(!id)return;                       // 没有对应录音（如界面兜底文案）就静默跳过
+ lastVoiceKey=key;
+ if(!voiceAudio){voiceAudio=new Audio();voiceAudio.preload='auto';}
+ try{voiceAudio.pause();voiceAudio.src='./audio/'+id+'.wav';voiceAudio.currentTime=0;const played=voiceAudio.play();if(played?.catch)played.catch(()=>{});}catch{}
+}
 // 心声停留时长：原 3 秒，整体上调 3 秒；只在这里改，所有心声统一生效。
 const HINT_MS=6000;
 // 同一条心声（按“节点+证词”计）最多显示两次：可以重复出现，但第三次就不再弹。
@@ -52,7 +66,7 @@ function showRecordsToast(message){
   },RECORDS_TOAST_MS);
 }
 function persist(){if(autosavePaused||platform.readOnly)return;try{const encoded=encodeSave(demoContent,state);localStorage.setItem(storageKey,encoded);platform.onSave?.(encoded);}catch{tell('浏览器自动保存暂不可用。你仍可用“导出存档”保存当前进度。');}}
-function act(action){if(platform.readOnly||platform.ready===false)return false;try{const needsCombination=Boolean(view&&!view.dialogue&&view.statementNeedsCombination);const result=dispatch(demoContent,state,action);if(!result.ok){tell(typeof result.error==='string'?result.error:'当前不能进行这项操作。');return false;}const panelOpen=$('investigation').open;state=result.state;notice='';persist();const started=result.events.find(event=>event.type==='interaction');if(started){musicInteraction=started.interactionId;musicInteractionAt=Date.now();}
+function act(action){if(platform.readOnly||platform.ready===false)return false;try{const needsCombination=Boolean(view&&!view.dialogue&&view.statementNeedsCombination);platform.onBeforeAct?.(state);const result=dispatch(demoContent,state,action);if(!result.ok){tell(typeof result.error==='string'?result.error:'当前不能进行这项操作。');return false;}const panelOpen=$('investigation').open;state=result.state;notice='';persist();const started=result.events.find(event=>event.type==='interaction');if(started){musicInteraction=started.interactionId;musicInteractionAt=Date.now();}
     // A single item cannot close a two-item point; nudge the player once per stage.
     if(needsCombination&&result.events.some(event=>event.type==='presentation_wrong')){
       const key=`combo|${state.stageId}`;
@@ -236,7 +250,9 @@ function render(externalView){
   else if(view.kind==='ending'){scene.append(el('p',view.outcome==='success'?'疑案得释':view.outcome==='final_failure'?'真相未尽':'疑点未明','small-help'));if(!view.dialogue){const note=el('div',undefined,'ending-summary');for(const line of demoContent.stages[view.stageId].intro||[])note.append(el('p',line.text,'small-help'));scene.append(note);}}
   else scene.append(el('p','前情提要 · 点击下方对白继续','small-help'));
   $('speaker').textContent=view.dialogue?.speaker||(view.kind==='hearing'?view.statement?.speaker||'证人':view.kind==='ending'?'卷宗记':'沈砚');
-  const text=view.dialogue?.text||(view.kind==='hearing'?view.statement?.text||'':view.kind==='investigation'?'先查看物件，听取陈述。准备好后再继续查问。':view.kind==='ending'?'卷宗暂合，案中人的命运已定。':'剪刀与发辫为何如此容易成为罪证？对妖术的恐惧，让对外来和尚的怀疑先于查证。');showLine(text,`${view.stageId}|${view.locationId}|${view.statementIndex}|${view.dialogueRemaining}|${view.dialogue?.speaker}|${text}`);
+  const text=view.dialogue?.text||(view.kind==='hearing'?view.statement?.text||'':view.kind==='investigation'?'先查看物件，听取陈述。准备好后再继续查问。':view.kind==='ending'?'卷宗暂合，案中人的命运已定。':'剪刀与发辫为何如此容易成为罪证？对妖术的恐惧，让对外来和尚的怀疑先于查证。');
+  if(view.dialogue||(view.kind==='hearing'&&view.statement))playVoiceLine($('speaker').textContent,text);
+  showLine(text,`${view.stageId}|${view.locationId}|${view.statementIndex}|${view.dialogueRemaining}|${view.dialogue?.speaker}|${text}`);
   // 正确结局通关后，在对白区下方附一句致谢旁白；同一结局只淡入一次，离开结局即撤下。
   const credit=$('ending-credit'),creditOn=view.kind==='ending'&&view.outcome==='success'&&!view.dialogue;
   if(credit){
@@ -371,11 +387,11 @@ document.addEventListener('keydown',event=>{
   const code=event.code||(event.key===' '?'Space':event.key?.length===1?'Key'+event.key.toUpperCase():event.key);
   if(uiHidden){if(code==='KeyH'||code===preferences.bindings.hide||code===preferences.bindings.advance||code==='Enter'){event.preventDefault();setHidden(false);}return;}
   const name=Object.keys(preferences.bindings).find(key=>preferences.bindings[key]===code)||(code==='Enter'&&preferences.bindings.advance==='Space'?'advance':null);
-  const commands={advance:()=>advanceDialogue(),previous:()=>{if(!view.dialogue&&view.kind==='hearing')act({type:'PREV_STATEMENT'});},next:()=>{if(!view.dialogue&&view.kind==='hearing')act({type:'NEXT_STATEMENT'});},press:()=>{if(!view.dialogue&&view.kind==='hearing')act({type:'PRESS'});},present:()=>{if(!view.dialogue&&['hearing','investigation'].includes(view.kind))openRecords(true);},records:()=>openRecords(),auto:()=>togglePlayback('auto'),hide:()=>setHidden(true),log:openLog,fullscreen:toggleFullscreen};
+  const commands={advance:()=>advanceDialogue(),previous:()=>{if(!view.dialogue&&view.kind==='hearing'){act({type:'PREV_STATEMENT'});return;}if(platform.undo?.())return;openLog();},next:()=>{if(!view.dialogue&&view.kind==='hearing')act({type:'NEXT_STATEMENT'});},press:()=>{if(!view.dialogue&&view.kind==='hearing')act({type:'PRESS'});},present:()=>{if(!view.dialogue&&['hearing','investigation'].includes(view.kind))openRecords(true);},records:()=>openRecords(),auto:()=>togglePlayback('auto'),hide:()=>setHidden(true),log:openLog,fullscreen:toggleFullscreen};
   if(name&&commands[name]){if(name==='advance'&&focused?.tagName==='BUTTON'&&['Space','Enter'].includes(code))return;event.preventDefault();commands[name]();}
 });
 try{const saved=JSON.parse(localStorage.getItem(settingsKey)||'null');if(saved&&[0,16,32].includes(saved.speed)&&typeof saved.reduceMotion==='boolean'){preferences={...preferenceDefaults,speed:saved.speed,reduceMotion:saved.reduceMotion,bindings:{...defaultBindings}};if(['small','medium','large'].includes(saved.fontSize))preferences.fontSize=saved.fontSize;if(Number.isFinite(saved.opacity)&&saved.opacity>=0&&saved.opacity<=85)preferences.opacity=saved.opacity;if([1000,2000,3000,5000].includes(saved.autoDelay))preferences.autoDelay=saved.autoDelay;if([4,8,16,32].includes(saved.fastSpeed))preferences.fastSpeed=saved.fastSpeed;if(saved.bindings&&Object.keys(defaultBindings).every(k=>/^(Key[A-Z]|Digit[0-9]|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Space|Enter)$/.test(saved.bindings[k]))&&new Set(Object.values(saved.bindings)).size===Object.keys(defaultBindings).length)preferences.bindings={...saved.bindings};}}catch{}applyPreferences();
 try{const saved=localStorage.getItem(storageKey);state=saved?decodeSave(demoContent,saved):createGame(demoContent);if(saved)notice='已恢复上次进度。';}catch(error){state=createGame(demoContent);autosavePaused=true;notice=`自动存档暂未载入：${error.message}。原存档尚未覆盖；可导入备份，或点“重新开始”。`;}
 render();
 if(platform.readOnly)for(const id of ['save','load','restart','node-open','auto-play','fast-forward','present-open','log-open'])$(id).disabled=true;
-platform.onReady?.({restore(save){state=decodeSave(demoContent,save);autosavePaused=false;localStorage.setItem(storageKey,save);render();},showView:external=>render(external),getState:()=>state,getView:()=>view,notice:tell});
+platform.onReady?.({restore(save){state=decodeSave(demoContent,save);autosavePaused=false;localStorage.setItem(storageKey,save);render();},showView:external=>render(external),getState:()=>state,getView:()=>view,setState(next){state=next;render();},notice:tell});

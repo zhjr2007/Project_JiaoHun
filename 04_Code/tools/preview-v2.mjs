@@ -2,15 +2,17 @@
 // Never use this server, its insecure localhost cookies or its fixtures in production.
 import http from 'node:http';
 import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {tmpdir,networkInterfaces} from 'node:os';
 import {resolve,join,extname,sep} from 'node:path';
 import {createSaveService} from '../network-server.mjs';
 import {hashSecretSync} from '../network/store.mjs';
 import {createGame,dispatch,getView} from '../core/engine.mjs';
 import {encodeSave} from '../core/save.mjs';
 const site=resolve(import.meta.dirname,'../../09_Builds/JiaoHun_Demo/site'),data=mkdtempSync(join(tmpdir(),'jiaohun-browser-qa-'));
-const port=Number(process.env.JIAOHUN_PREVIEW_PORT||4188),origin=`http://127.0.0.1:${port}`;
-const api=createSaveService({site,data,allowedOrigins:[origin],secureCookies:false});
+const port=Number(process.env.JIAOHUN_PREVIEW_PORT||4188),host=process.env.JIAOHUN_PREVIEW_HOST||'127.0.0.1',origin=`http://${host}:${port}`;
+const api=createSaveService({site,data,allowedOrigins:host==='0.0.0.0'
+ ? [`http://127.0.0.1:${port}`,`http://localhost:${port}`,...Object.values(networkInterfaces()).flat().filter(i=>i&&i.family==='IPv4'&&!i.internal).map(i=>`http://${i.address}:${port}`)]
+ : [origin],secureCookies:false});
 for(const role of ['presenter','inspector'])api.createOperator({role,name:'qa-'+role,password:'LocalPreview123!'});
 // Explicit synthetic fixtures in this disposable local-only database. Never
 // import this preview tool into the production runtime or deployment bundle.
@@ -41,5 +43,5 @@ const server=http.createServer((req,res)=>{
  const path=resolve(site,rel||'index.html');if(!path.startsWith(site+sep)){res.writeHead(403).end();return;}
  try{const bytes=readFileSync(path);res.writeHead(200,{'Content-Type':types[extname(path)]||'text/plain; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'",'X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:bytes);}catch{res.writeHead(404).end('Not found');}
 });
-server.listen(port,'127.0.0.1',()=>console.log(`LOCAL QA ONLY ${origin}/game/ — disposable data, synthetic operator fixtures`));
+server.listen(port,host,()=>console.log(`LOCAL QA ONLY ${origin}/game/ — disposable data, synthetic operator fixtures${host==='0.0.0.0'?'（已开放到局域网，仅限本机演示，勿用于生产）':''}`));
 for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>server.close(()=>{api.db.close();rmSync(data,{recursive:true,force:true});process.exit(0);}));
