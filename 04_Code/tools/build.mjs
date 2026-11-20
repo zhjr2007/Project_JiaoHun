@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { zipDirectory } from './zip.mjs';
 import { buildStaticSite } from './static-site.mjs';
+import { buildVoiceData } from './build-voice.mjs';
 const codeRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const project=resolve(codeRoot,'..');
 const build=resolve(project,'09_Builds','JiaoHun_Demo');
@@ -57,5 +58,8 @@ await writeFile(resolve(build,'README.txt'),'萧山剪辫案 Demo v0.2.0\n\n最�
 const zip=resolve(project,'09_Builds','JiaoHun_Demo.zip');
 await cp(resolve(project,'02_Art/ASSET_MANIFEST.json'),resolve(build,'ASSET_MANIFEST.json'));
 await buildStaticSite(project,build);
+// 由关卡内容派生配音清单（lines / voice-index / voice-scene），避免手工文件漂移
+const voiceData=buildVoiceData({site:resolve(build,'site')});
+console.log(`配音清单：${voiceData.lines} 句，索引 ${voiceData.index} 条，场景 ${voiceData.scenes} 个${voiceData.skipped?'（'+voiceData.skipped+'）':''}`);
 const result=await zipDirectory(build,zip);
 console.log(`已生成：${build}\n${zip}\n${result.files} files, ${result.bytes} bytes`);
