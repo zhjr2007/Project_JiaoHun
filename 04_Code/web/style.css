@@ -187,3 +187,9 @@ body:not(.fullscreen-landscape) .orientation-note button.primary{background:#8f4
 body:not(.fullscreen-landscape) .game-shell .notice{top:calc(clamp(56px,6vw,82px) + 30px);bottom:auto;left:16%;right:16%;max-width:none;padding:6px 12px;background:#0a130ed9;border-radius:3px}
 @media (orientation:portrait),(max-width:520px){body:not(.fullscreen-landscape) .game-shell .notice{top:auto;bottom:43%;left:8%;right:8%;max-width:84%}}
 @media (max-height:520px) and (min-width:521px){body:not(.fullscreen-landscape) .game-shell .notice{top:auto;bottom:34%}}
+
+/* 旋转全屏（竖着拿手机时的兜底布局）里，证物条会被一起转 90°，在屏幕上看是竖排：
+   横向滑动落在它的 y 轴上，而 y 轴是 overflow:hidden，所以"左右滑动选不了"。
+   这里直接在旋转态改为换行铺开——卡片全部可见，不再需要滑动。 */
+body.fullscreen-landscape .record-grid{flex-wrap:wrap;overflow:visible;scroll-snap-type:none;touch-action:pan-y}
+body.fullscreen-landscape .record-card{flex:0 0 auto;min-width:88px}
