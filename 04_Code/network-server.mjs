@@ -121,6 +121,12 @@ export function createSaveService({site,data,allowedOrigins=[],clock=Date.now,se
    }
    if(path==='/api/v2/operator/me'&&req.method==='GET'){const role=url.searchParams.get('role');if(!['presenter','inspector'].includes(role))fail(400,'角色无效');const op=auth(req,role);return send(200,{operator:{name:op.name,role}});}
    if(path==='/api/v2/operator/logout'&&req.method==='POST'){if(!['presenter','inspector'].includes(body.role))fail(400,'角色无效');clearSession(req,res,body.role);return send(200,{ok:true});}
+   if(path==='/api/v2/demo/reset'&&req.method==='POST'){
+    // 只重置「独立演示」存档：presenter 专用，不触碰任何玩家存档。
+    // 演示存档若停在旧内容版本，服务端会拒绝直接覆盖（428），这里给一条显式重置通路。
+    const subject=auth(req,'presenter',true);const slug=String(body&&body.slug||'');if(!/^[a-z0-9-]+$/.test(slug)||!contents.has(slug))fail(400,'关卡无效');
+    db.prepare('DELETE FROM demos WHERE operator=? AND slug=?').run(subject.id,slug);return send(200,{ok:true,slug,reset:true});
+   }
    const saveMatch=path.match(/^\/api\/v2\/(saves|demo)\/([a-z0-9-]+)$/);
    if(saveMatch){
     const demo=saveMatch[1]==='demo',slug=saveMatch[2],subject=auth(req,demo?'presenter':'player',true);if(!contents.has(slug))fail(404,'没有这个关卡');const current=saveFor(subject.id,slug,demo);
