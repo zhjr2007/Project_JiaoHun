@@ -181,6 +181,23 @@ export function createSaveService({site,data,allowedOrigins=[],clock=Date.now,se
     const op=auth(req,'inspector',true);if(!rate('diagnostics:'+op.id,5))fail(429,'检修任务过于频繁');const checks=diagnosticChecks(),id=randomBytes(16).toString('hex'),result={id,status:checks.every(c=>c.ok)?'passed':'failed',checks,isolated:true,createdAt:nowISO()};db.prepare('INSERT INTO diagnostic_runs VALUES(?,?,?,?)').run(id,op.id,JSON.stringify(result),nowISO());db.prepare('DELETE FROM diagnostic_runs WHERE owner=? AND id NOT IN (SELECT id FROM diagnostic_runs WHERE owner=? ORDER BY created_at DESC LIMIT 20)').run(op.id,op.id);return send(200,result);
    }
    const run=path.match(/^\/api\/v2\/diagnostics\/runs\/([a-f0-9]{32})$/);if(run&&req.method==='GET'){const op=auth(req,'inspector'),row=db.prepare('SELECT result FROM diagnostic_runs WHERE id=? AND owner=?').get(run[1],op.id);if(!row)fail(404,'没有此检修记录');return send(200,JSON.parse(row.result));}
+   const observeAsInspector=path.match(/^\/api\/v2\/diagnostics\/players\/(\d+)\/observe$/);
+   if(observeAsInspector&&req.method==='GET'){
+    // 检修只读查看任意玩家的任意进度：不依赖展示房间，不改动存档。
+    auth(req,'inspector');const playerId=Number(observeAsInspector[1]),wanted=url.searchParams.get('slug')||'',list=progress(playerId),selected=(wanted&&list.find(item=>item.slug===wanted))||list.slice().sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
+    if(!selected)return send(200,{view:null,slug:null,revision:0,playerId});
+    if(selected.migrationRequired)return send(200,{view:null,slug:selected.slug,revision:selected.revision,migrationRequired:true,playerId});
+    const content=contents.get(selected.slug);if(!content)fail(404,'关卡不存在');const stored=saveFor(playerId,selected.slug);if(!stored)return send(200,{view:null,slug:selected.slug,revision:0,playerId});
+    return send(200,{view:getView(content,decodeSave(content,stored.save)),slug:selected.slug,revision:stored.revision,playerId});
+   }
+   const saveAsInspector=path.match(/^\/api\/v2\/diagnostics\/players\/(\d+)\/save$/);
+   if(saveAsInspector&&req.method==='GET'){
+    // 检修沙盒：把原始存档交给前端本地引擎，可自由前后推进；只读副本，不写回玩家。
+    auth(req,'inspector');const playerId=Number(saveAsInspector[1]),wanted=url.searchParams.get('slug')||'',list=progress(playerId),selected=(wanted&&list.find(item=>item.slug===wanted))||list.slice().sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
+    if(!selected)fail(404,'该玩家没有可查看的进度');if(selected.migrationRequired)fail(409,'该进度需先在玩家入口确认迁移');
+    const content=contents.get(selected.slug);if(!content)fail(404,'关卡不存在');const stored=saveFor(playerId,selected.slug);if(!stored)fail(404,'没有找到该进度存档');
+    return send(200,{slug:selected.slug,version:stored.version,revision:stored.revision,save:stored.save,playerId,stageTitle:selected.stageTitle});
+   }
    fail(404,'没有这个接口');
   }catch(error){if(!res.headersSent)send(error.status||500,{error:error.status?error.message:'服务暂不可用，请保留本机进度后稍后重试',...(error.field?{field:error.field}:{})});else res.end();}
  });

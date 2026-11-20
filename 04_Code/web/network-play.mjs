@@ -3,8 +3,9 @@ import {connectProgress} from './cloud-progress.mjs';
 import {levelSlug,demoContent} from './level-loader.mjs';
 import {decodeSave} from './core/save.mjs';
 import {previewMigration} from './core/migrate.mjs';
-const params=new URL(location.href).searchParams,observe=params.get('observe'),demo=params.get('demo')==='1';
+const params=new URL(location.href).searchParams,observe=params.get('observe'),inspect=params.get('inspect'),demo=params.get('demo')==='1';
 let identity,cloud,stopPresence=()=>{},source;
+const sandboxHistory=[];
 async function importProgress(raw){
  try{decodeSave(demoContent,raw);return raw;}catch(error){if(error.code!=='CONTENT_VERSION')throw error;}
  const indexResponse=await fetch('./levels/index.json',{cache:'no-cache'});if(!indexResponse.ok)throw Error('旧版卷宗目录暂不可用');
@@ -22,17 +23,44 @@ async function importProgress(raw){
 if(observe||demo){
  try{const result=await api('operator/me?role=presenter');identity={id:'presenter:'+result.operator.name,name:result.operator.name};}
  catch{location.replace('./operator.html?role=presenter');await new Promise(()=>{});}
+}else if(inspect){
+ try{const result=await api('operator/me?role=inspector');identity={id:'inspector:'+result.operator.name,name:result.operator.name};}
+ catch{location.replace('./operator.html?role=inspector');await new Promise(()=>{});}
 }else identity=await requirePlayer();
 export const gamePlatform={
- ready:false,readOnly:Boolean(observe),
- storageKey:`jiaohun.play.v2.${identity.id}.${demo?'demo':observe?'observer':'player'}.${levelSlug}.${demoContent.version}`,
- restartMessage:demo?'重新开始这份独立演示？真实玩家的存档不受影响。':'重新开始会替换当前账号此关的进度。需要保留时请先导出备用存档。',
+ ready:false,readOnly:Boolean(observe),sandbox:false,
+ storageKey:`jiaohun.play.v2.${identity.id}.${demo?'demo':observe?'observer':inspect?'inspector':'player'}.${levelSlug}.${demoContent.version}`,
+ restartMessage:demo?'重新开始这份独立演示？真实玩家的存档不受影响。':inspect?'重新载入该玩家存档起点？不会影响玩家本人进度。':'重新开始会替换当前账号此关的进度。需要保留时请先导出备用存档。',
  onSave:save=>cloud?.queue(save),flush:()=>cloud?.flush(),
+ onBeforeAct:state=>{if(!gamePlatform.sandbox)return;try{sandboxHistory.push(structuredClone(state));if(sandboxHistory.length>400)sandboxHistory.shift();}catch{}},
  importSave:importProgress,
  async onReady(controller){
   const status=document.getElementById('cloud-status');
   try{
-   if(observe){
+   if(inspect){
+    // 检修沙盒：载入玩家存档副本，用本地引擎自由前后推进；只在本标签页，不写回玩家。
+    if(!/^\d+$/.test(inspect))throw Error('检修查看参数无效');
+    try{
+     const pack=await api(`diagnostics/players/${encodeURIComponent(inspect)}/save?slug=${encodeURIComponent(levelSlug)}`);
+     if(pack.slug&&pack.slug!==levelSlug){const next=new URL(location.href);next.searchParams.set('level',pack.slug);location.replace(next.href);return;}
+     controller.restore(pack.save);
+     gamePlatform.ready=true;gamePlatform.readOnly=false;gamePlatform.sandbox=true;
+     gamePlatform.undo=()=>{const previous=sandboxHistory.pop();if(!previous)return false;controller.setState(previous);return true;};
+     status.textContent=`检修沙盒 · 玩家 #${pack.playerId} · ${pack.stageTitle||''} · 可自由推进，改动不会写回玩家存档`;
+     const sandboxKey=event=>{
+      if(event.target&&['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName))return;
+      if(event.key!=='Backspace'||event.metaKey||event.ctrlKey||event.altKey)return;
+      const previous=sandboxHistory.pop();
+      if(previous){event.preventDefault();controller.setState(previous);status.textContent='检修沙盒 · 已回退一步（Backspace 可连续回退）';}
+      else status.textContent='检修沙盒 · 已经回到载入时的状态';
+     };
+     addEventListener('keydown',sandboxKey);
+     addEventListener('pagehide',()=>removeEventListener('keydown',sandboxKey),{once:true});
+    }catch(error){
+     const text=node('p',error.status===401?'检修登录已失效，请返回检修入口。':'无法载入该进度：'+(error.message||'未知原因'),'observer-message');
+     text.setAttribute('role','status');document.getElementById('game').replaceChildren(text);
+    }
+   }else if(observe){
     const room=params.get('room');if(!room||!/^\d+$/.test(observe))throw Error('观察参数无效');
     let busy=false,again=false,last=-1,stopped=false;
     function stop(message){if(stopped)return;stopped=true;gamePlatform.stopped=true;source?.close();const text=node('p',message,'observer-message');text.setAttribute('role','status');document.getElementById('game').replaceChildren(text);}
@@ -51,7 +79,7 @@ export const gamePlatform={
     gamePlatform.ready=true;
     if(!demo){stopPresence=startRoomPresence(levelSlug,identity.id);const leave=document.getElementById('leave-room');leave.hidden=!roomId();leave.addEventListener('click',async()=>{try{await leaveRoom(identity.id);stopPresence();leave.hidden=true;controller.notice('已退出本次展示，可继续私下游玩。');}catch(error){controller.notice(error.message);}});}
    }
-  }catch(error){status.textContent=error.message;if(error.code==='MIGRATION_REQUIRED'||error.status===428){controller.notice(error.message);gamePlatform.ready=false;const back=node('a','返回入口查看迁移说明');back.href='./';status.replaceChildren(back);return;}controller.notice('网络暂不可用，请保留本机进度或导出备份。');if(!observe)gamePlatform.ready=true;}
+  }catch(error){status.textContent=error.message;if(error.code==='MIGRATION_REQUIRED'||error.status===428){controller.notice(error.message);gamePlatform.ready=false;const back=node('a','返回入口查看迁移说明');back.href='./';status.replaceChildren(back);return;}controller.notice('网络暂不可用，请保留本机进度或导出备份。');if(!observe&&!inspect)gamePlatform.ready=true;}
  }
 };
 window.addEventListener('pagehide',()=>{cloud?.flush(true);stopPresence();source?.close();});
