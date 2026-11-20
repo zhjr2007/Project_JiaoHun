@@ -58,7 +58,7 @@ node 04_Code/tools/build.mjs
 此仓库尚未授予开源许可。
 # NAS 网络存档版与投稿
 
-入口构建在 `09_Builds/JiaoHun_Demo/site/`，关卡源在 `levels/`，投稿规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。线上 v2 使用独立的 `network-server.mjs`、SQLite 和游戏专用账号；玩家以用户名和密码登录，注册时一次性展示恢复码，进度自动保存到 NAS。主持端与检修端使用另建的专用角色账号，不复用玩家密码或 NAS 系统账号。最新部署与运维说明见 [网络存档记录](00_Docs/NETWORK_SAVE_20261115.md)、[v2 交接单](04_Code/deploy/AUTH_V2_HANDOFF.md) 与 [入场页改版部署计划](00_Docs/NAS_DEPLOY_PLAN_20261120.md)。旧版离线 Demo.html 和本机 server.mjs 仍保持离线行为。
+入口构建在 `09_Builds/JiaoHun_Demo/site/`，关卡源在 `levels/`，投稿规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。线上 v2 使用独立的 `network-server.mjs`、SQLite 和游戏专用账号；玩家以用户名和密码登录，注册时一次性展示恢复码，进度自动保存到 NAS。主持端与检修端使用另建的专用角色账号，不复用玩家密码或 NAS 系统账号。最新部署与运维说明见 [网络存档记录](00_Docs/NETWORK_SAVE_20261115.md)、[v2 交接单](04_Code/deploy/AUTH_V2_HANDOFF.md) 与 [入场页改版部署计划](00_Docs/NAS_DEPLOY_PLAN_20261120.md)；四个入口与缓存说明见 [入口清单](00_Docs/GAME_ENTRIES_AND_CACHE.md)。旧版离线 Demo.html 和本机 server.mjs 仍保持离线行为。
 
 项目共享账号、Git 工作流与受控服务重启见 [NAS 项目维护说明](00_Docs/COLLABORATOR_NAS_ACCESS.md)。
 
