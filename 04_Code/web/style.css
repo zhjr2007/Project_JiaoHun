@@ -193,3 +193,8 @@ body:not(.fullscreen-landscape) .game-shell .notice{top:calc(clamp(56px,6vw,82px
    这里直接在旋转态改为换行铺开——卡片全部可见，不再需要滑动。 */
 body.fullscreen-landscape .record-grid{flex-wrap:wrap;overflow:visible;scroll-snap-type:none;touch-action:pan-y}
 body.fullscreen-landscape .record-card{flex:0 0 auto;min-width:88px}
+/* 竖屏时音乐开关会压住底部控件（继续/对白操作）：移到屏幕左侧中部，
+   那里是场景画面，没有可点控件。内联样式由 audio.mjs 写在元素上，故此处需要 !important。 */
+@media (orientation:portrait) and (max-width:900px){
+  .music-chip{left:8px !important;bottom:auto !important;top:52% !important;transform:translateY(-50%) !important;padding:8px 10px !important;font-size:11px !important;max-width:104px !important;white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important;z-index:80 !important}
+}
