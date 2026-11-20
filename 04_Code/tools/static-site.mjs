@@ -11,6 +11,7 @@ export async function buildStaticSite(project,build){
  await cp(resolve(code,'web/vendor'),resolve(site,'vendor'),{recursive:true});
  await cp(resolve(code,'web/chrome'),resolve(site,'chrome'),{recursive:true});
  await cp(resolve(code,'web/media'),resolve(site,'media'),{recursive:true});
+ await cp(resolve(code,'web/audio'),resolve(site,'audio'),{recursive:true});
  await copyFile(resolve(code,'web/lobby.html'),resolve(site,'index.html'));
  let html=await readFile(resolve(code,'web/index.html'),'utf8');
  html=html.replace('href="/style.css"','href="./style.css"').replace('src="/app.mjs"','src="./app.mjs"').replace('src="/audio.mjs"','src="./audio.mjs"').replace('href="/" aria-label','href="./" aria-label');
