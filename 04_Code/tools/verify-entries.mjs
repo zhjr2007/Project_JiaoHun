@@ -18,7 +18,7 @@ const DEFAULT_BASES = [
   'https://sociology.lumi-ember.xyz:8443/game'
 ];
 
-// 覆盖四类：页面、样式/脚本、生成的纹理、配乐、接口健康。
+// 覆盖五类：页面、样式/脚本、生成的纹理、配乐、派生清单与接口健康。
 const DEFAULT_PATHS = [
   '/',
   '/lobby.css',
@@ -28,6 +28,8 @@ const DEFAULT_PATHS = [
   '/audio.mjs',
   '/chrome/paper.webp',
   '/media/bgm/bgm_01_entry.mp3',
+  '/lines.json',
+  '/voice-index.json',
   '/api/v2/health'
 ];
 
